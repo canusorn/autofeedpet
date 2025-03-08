@@ -29,12 +29,14 @@ byte colPins[COLS] = { 16, 4, 0, 2 };    //connect to the column pinouts of the 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 unsigned long previousMillis = 0, previousServo;
+float weight = 0;
 
 int pos = 0;  // variable to store the servo position
-int posDegrees = 0;
+int posDegrees = 0, posStop;
 int inc = 1;
 int period = 0;
 bool servo_on = 0;
+uint8_t state = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -49,21 +51,42 @@ void setup() {
 void loop() {
   char key = keypad.getKey();
   if (key) {
-    Serial.println(key);
-    if (key == '1') {
-      servo_on = 1;
-      posDegrees = 0;
-    } else if (key == '9') {
-      servo_on = 1;
-      posDegrees = 180;
+    Serial.println("press:" + key);
+    if (state == 0) {
+      if (key == '1') {
+        servo_on = 1;
+        posStop = weight - BUTTON1;
+      } else if (key == '2') {
+        servo_on = 1;
+        posStop = weight - BUTTON2;
+      } else if (key == '3') {
+        servo_on = 1;
+        posStop = weight - BUTTON3;
+      } else if (key == '4') {
+        servo_on = 1;
+        posStop = weight - BUTTON4;
+      }
     }
   }
 
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= 2000) {
+  if (currentMillis - previousMillis >= 2000 && !servo_on) {  // idle
     previousMillis = currentMillis;
 
-    Serial.println(scale.get_units(2));
+    weight = scale.get_units(2);
+    Serial.println("Weight: " + String(weight) + " g");
+
+  } else if (currentMillis - previousMillis >= 500 && servo_on) {  // number mode
+    previousMillis = currentMillis;
+
+    weight = scale.get_units(2);
+    Serial.println("Weight: " + String(weight) + " g\tStop weight: " + String(posStop));
+
+    if (weight <= posStop) {
+      posStop = 0;
+      servo_on = 0;
+      Serial.println("Stop!!");
+    }
   }
 
 
@@ -74,7 +97,7 @@ void loop() {
     if (servo_on) {
       servo1.write(posDegrees);
       period++;
-      if (period >= 30) {
+      if (period >= 20) {
         period = 0;
         if (posDegrees == 180) posDegrees = 0;
         else posDegrees = 180;
