@@ -6,6 +6,10 @@
 #include "HX711.h"
 #include <Keypad.h>
 #include <ESP32Servo.h>
+#include <LCD-I2C.h>
+#include <Wire.h>
+
+LCD_I2C lcd(0x27, 16, 2);  // Default address of most PCF8574 modules, change according
 
 HX711 scale;
 
@@ -27,6 +31,7 @@ byte rowPins[ROWS] = { 19, 18, 5, 17 };  //connect to the row pinouts of the key
 byte colPins[COLS] = { 16, 4, 0, 2 };    //connect to the column pinouts of the keypad
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+String number = "";
 
 unsigned long previousMillis = 0, previousServo;
 float weight = 0;
@@ -36,10 +41,19 @@ int posDegrees = 0, posStop;
 int inc = 1;
 int period = 0;
 bool servo_on = 0;
-uint8_t state = 0;
+uint8_t state = 0;  // 0-auto   1-manual
 
 void setup() {
   Serial.begin(115200);
+
+  Wire.begin(26, 27, 50000);
+  lcd.begin(&Wire);
+  lcd.print("Weight:");
+  lcd.setCursor(15, 0);
+  lcd.print("g");
+  lcd.display();
+  lcd.backlight();
+
   servo1.attach(12);
   scale.begin(dataPin, clockPin);
   //  load cell factor 5 KG
@@ -49,6 +63,7 @@ void setup() {
 }
 
 void loop() {
+
   char key = keypad.getKey();
   if (key) {
     Serial.println("press:" + key);
@@ -65,9 +80,40 @@ void loop() {
       } else if (key == '4') {
         servo_on = 1;
         posStop = weight - BUTTON4;
+      } else if (key == 'D') {  //  reset the scale to zero = 0
+        scale.tare();
+      } else if (key == 'A') {
+        state = 1;
       }
+
+      if (posStop < 0) { posStop = 0; }
+    } else if (state == 1) {
+
+      if (key >= '0' && key <= '9') {  // Check if it's a numeric key
+        number += key;                 // Append the key to the number string
+        Serial.println(number);        // Echo the key to the serial monitor
+      } else if (key == '#') {         // If the '#' key is pressed, end input
+        Serial.println("\nInput completed.");
+        state = 0;
+        int feedWeight = number.toInt();
+        number = "";
+        Serial.println("input:" + String(feedWeight));
+        servo_on = 1;
+        posStop = weight - feedWeight;
+      } else if (key == '*') {  // Optional: Handle '*' as a backspace
+        if (number.length() > 0) {
+          number.remove(number.length() - 1);  // Remove the last character
+        }
+        Serial.println(number);  // Echo the key to the serial monitor
+      }
+
+
+      if (posStop < 0) { posStop = 0; }
     }
+
+    previousMillis = 0;
   }
+
 
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= 2000 && !servo_on) {  // idle
@@ -76,17 +122,51 @@ void loop() {
     weight = scale.get_units(2);
     Serial.println("Weight: " + String(weight) + " g");
 
+    lcd.setCursor(8, 0);
+    lcd.print("       ");
+    lcd.setCursor(8, 0);
+    lcd.print(String(weight, 0));
+    lcd.setCursor(0, 1);
+    lcd.print("              ");
+    if (state == 1) {
+      lcd.setCursor(0, 1);
+      lcd.print("feed[g]: ");
+      lcd.print(number);
+    }
+    lcd.display();
+
+
   } else if (currentMillis - previousMillis >= 500 && servo_on) {  // number mode
     previousMillis = currentMillis;
 
     weight = scale.get_units(2);
     Serial.println("Weight: " + String(weight) + " g\tStop weight: " + String(posStop));
 
+    lcd.setCursor(8, 0);
+    lcd.print("       ");
+    lcd.setCursor(8, 0);
+    lcd.print(String(weight, 0));
+
+    lcd.setCursor(0, 1);
+    lcd.print("              ");
+    lcd.setCursor(0, 1);
+    lcd.print("feeding (");
+    lcd.print(String(posStop));
+    lcd.print(")");
+
+
     if (weight <= posStop) {
       posStop = 0;
       servo_on = 0;
       Serial.println("Stop!!");
+
+      lcd.setCursor(0, 1);
+      lcd.print("              ");
+      lcd.setCursor(0, 1);
+      lcd.print("Stop feeding");
     }
+
+    lcd.display();
   }
 
 
@@ -104,4 +184,32 @@ void loop() {
       }
     }
   }
+}
+
+String getNumberFromKeypad() {
+  String number = "";  // To store the entered number
+  char key;
+
+  Serial.println("Enter a number using the keypad. Press '#' to finish.");
+
+  while (true) {
+    key = keypad.getKey();  // Get the key pressed
+
+    if (key) {                         // If a key is pressed
+      if (key >= '0' && key <= '9') {  // Check if it's a numeric key
+        number += key;                 // Append the key to the number string
+        Serial.print(key);             // Echo the key to the serial monitor
+      } else if (key == '#') {         // If the '#' key is pressed, end input
+        Serial.println("\nInput completed.");
+        break;
+      } else if (key == '*') {  // Optional: Handle '*' as a backspace
+        if (number.length() > 0) {
+          number.remove(number.length() - 1);  // Remove the last character
+          Serial.print("\b \b");               // Backspace effect on the serial monitor
+        }
+      }
+    }
+  }
+
+  return number;  // Return the entered number as a string
 }
