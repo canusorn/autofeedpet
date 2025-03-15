@@ -3,11 +3,26 @@
 #define BUTTON3 85
 #define BUTTON4 190
 
+#define BLYNK_PRINT Serial
+
+/* Fill in information from Blynk Device Info here */
+#define BLYNK_TEMPLATE_ID "TMPL6x62Fri32"
+#define BLYNK_TEMPLATE_NAME "esp32 keypad feeding"
+#define BLYNK_AUTH_TOKEN "v3VBnzocBMdBlKp7zT2RRfBtwVluyfAv"
+
 #include "HX711.h"
 #include <Keypad.h>
 #include <ESP32Servo.h>
 #include <LCD-I2C.h>
 #include <Wire.h>
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+
+// Your WiFi credentials.
+// Set password to "" for open networks.
+char ssid[] = "G6PD";
+char pass[] = "570610193";
 
 LCD_I2C lcd(0x27, 16, 2);  // Default address of most PCF8574 modules, change according
 
@@ -60,9 +75,12 @@ void setup() {
   scale.set_scale(380);  //  TODO you need to calibrate this yourself.
   //  reset the scale to zero = 0
   scale.tare();
+
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
 }
 
 void loop() {
+  Blynk.run();
 
   char key = keypad.getKey();
   if (key) {
@@ -121,6 +139,7 @@ void loop() {
 
     weight = scale.get_units(2);
     Serial.println("Weight: " + String(weight) + " g");
+    Blynk.virtualWrite(V0, weight);
 
     lcd.setCursor(8, 0);
     lcd.print("       ");
@@ -141,6 +160,7 @@ void loop() {
 
     weight = scale.get_units(2);
     Serial.println("Weight: " + String(weight) + " g\tStop weight: " + String(posStop));
+    Blynk.virtualWrite(V0, weight);
 
     lcd.setCursor(8, 0);
     lcd.print("       ");
@@ -184,32 +204,4 @@ void loop() {
       }
     }
   }
-}
-
-String getNumberFromKeypad() {
-  String number = "";  // To store the entered number
-  char key;
-
-  Serial.println("Enter a number using the keypad. Press '#' to finish.");
-
-  while (true) {
-    key = keypad.getKey();  // Get the key pressed
-
-    if (key) {                         // If a key is pressed
-      if (key >= '0' && key <= '9') {  // Check if it's a numeric key
-        number += key;                 // Append the key to the number string
-        Serial.print(key);             // Echo the key to the serial monitor
-      } else if (key == '#') {         // If the '#' key is pressed, end input
-        Serial.println("\nInput completed.");
-        break;
-      } else if (key == '*') {  // Optional: Handle '*' as a backspace
-        if (number.length() > 0) {
-          number.remove(number.length() - 1);  // Remove the last character
-          Serial.print("\b \b");               // Backspace effect on the serial monitor
-        }
-      }
-    }
-  }
-
-  return number;  // Return the entered number as a string
 }
