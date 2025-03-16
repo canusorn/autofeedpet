@@ -1,7 +1,18 @@
+/*
+LCD
+SCL - 27
+SDA - 26
+
+
+*/
+
+
 #define BUTTON1 45
 #define BUTTON2 70
 #define BUTTON3 85
 #define BUTTON4 190
+
+#define LOWFOOD 300
 
 #define BLYNK_PRINT Serial
 
@@ -55,7 +66,7 @@ int pos = 0;  // variable to store the servo position
 int posDegrees = 0, posStop;
 int inc = 1;
 int period = 0;
-bool servo_on = 0;
+bool servo_on = 0, calebrate = 1;
 uint8_t state = 0;  // 0-auto   1-manual
 
 void setup() {
@@ -66,6 +77,8 @@ void setup() {
   lcd.print("Weight:");
   lcd.setCursor(15, 0);
   lcd.print("g");
+  lcd.setCursor(0, 1);
+  lcd.print("Connecting blynk");
   lcd.display();
   lcd.backlight();
 
@@ -75,6 +88,7 @@ void setup() {
   scale.set_scale(380);  //  TODO you need to calibrate this yourself.
   //  reset the scale to zero = 0
   scale.tare();
+
 
   Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
 }
@@ -100,6 +114,7 @@ void loop() {
         posStop = weight - BUTTON4;
       } else if (key == 'D') {  //  reset the scale to zero = 0
         scale.tare();
+        calebrate = 1;
       } else if (key == 'A') {
         state = 1;
       }
@@ -141,12 +156,18 @@ void loop() {
     Serial.println("Weight: " + String(weight) + " g");
     Blynk.virtualWrite(V0, weight);
 
+    if (calebrate == 1 && weight > LOWFOOD) {
+      calebrate = 0;
+    } else if (calebrate == 0 && weight < LOWFOOD) {
+      Blynk.logEvent("low_food");
+    }
+
     lcd.setCursor(8, 0);
     lcd.print("       ");
     lcd.setCursor(8, 0);
     lcd.print(String(weight, 0));
     lcd.setCursor(0, 1);
-    lcd.print("              ");
+    lcd.print("                ");
     if (state == 1) {
       lcd.setCursor(0, 1);
       lcd.print("feed[g]: ");
@@ -168,7 +189,7 @@ void loop() {
     lcd.print(String(weight, 0));
 
     lcd.setCursor(0, 1);
-    lcd.print("              ");
+    lcd.print("                ");
     lcd.setCursor(0, 1);
     lcd.print("feeding (");
     lcd.print(String(posStop));
