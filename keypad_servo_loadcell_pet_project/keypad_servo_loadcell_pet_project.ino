@@ -1,18 +1,39 @@
 /*
+
 LCD
+5V - 5V
+GND - GND
 SCL - 27
 SDA - 26
+
 
 servo motor
 สายสีน้ำตาล -> GND
 สายสีแดง -> 5V
 สายสีส้ม -> 12
 
-virtual pin
 
+loadcell
+VCC - 3.3V
+GND - GND
+DT - 23
+SCK - 22
+
+
+Keypad
+__________
+| 1 2 3 A |
+| 4 5 6 B |
+| 7 8 9 C |
+| * 0 # D |
+__________
+ | | ..  | |
+19 18 .. 0 2
+
+
+virtual pin
 v0 - weight
 v1 - g to feed
-
 v2 - BUTTON1
 v3 - BUTTON2
 v4 - BUTTON3
